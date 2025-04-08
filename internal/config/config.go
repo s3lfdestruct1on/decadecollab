@@ -1,11 +1,11 @@
 package config
 
 type Config struct{
-	AppPort  int    `env:"PORT,required,omitempty"`
+	AppPort  int    `env:"PORT,required"`
 }
 
 type PSQLConfig struct{
-	Username string `env:"USER,required,omitempty"`
-	Password string	`env:"PASS,required,omitempty"`
-	Database string `env:"DB,required,omitempty"`
+	Username string `env:"USER,required"`
+	Password string	`env:"PASS,required"`
+	Database string `env:"DB,required"`
 }
