@@ -5,6 +5,7 @@ import (
 	"decadecollab/internal/server/handlers"
 	"fmt"
 	"os"
+
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/labstack/echo/v4"
 )
@@ -14,7 +15,6 @@ var (
 	}
 )
 func main() {
-	
 	
 	server := echo.New()
 
