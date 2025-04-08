@@ -1,7 +1,7 @@
 package config
 
 type Config struct{
-	AppPort  int    `env:"PORT,required"`
+	AppHostPort  string    `env:"HOSTPORT,required"`
 }
 
 type PSQLConfig struct{
