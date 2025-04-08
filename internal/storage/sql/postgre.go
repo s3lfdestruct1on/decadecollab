@@ -10,11 +10,11 @@ import (
 )
 
 //logger sdelai :-)
-func DBConn() (*pgx.Conn,error){
-	usr := config.PSQLConfig.Username
-	pass := config.PSQLConfig.Password
-	db := config.PSQLConfig.Database
-	port := config.PSQLConfig.Port
+func DBConn(cfg config.PSQLConfig) (*pgx.Conn,error){
+	usr := cfg.Username
+	pass := cfg.Password
+	db := cfg.Database
+	port := cfg.Port
 	strConn := fmt.Sprintf("postgres://%s:%s@localhost:%s/%s",usr,pass,port,db)
 	
 	conn,err := pgx.Connect(context.Background(),strConn)
