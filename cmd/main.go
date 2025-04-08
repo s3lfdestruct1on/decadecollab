@@ -21,7 +21,7 @@ func main() {
 	apiv1 := server.Group("/api/v1")
 
 	apiv1.GET("/time", handlers.CurrentTime)
-
+	apiv1.GET("/user/:id", handlers.GetUser)
 	if err := server.Start(cfg.AppHostPort); err != nil {
 		fmt.Println(err.Error())
 	}
