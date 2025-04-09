@@ -15,6 +15,8 @@ func DBConn(cfg config.PSQLConfig) (*pgx.Conn,error){
 	db := cfg.Database
 	port := cfg.Port
 	strConn := fmt.Sprintf("postgres://%s:%s@localhost:%s/%s",usr,pass,port,db)
+	fmt.Println(strConn)
+	
 	
 	conn,err := pgx.Connect(context.Background(),strConn)
 	if err != nil {
