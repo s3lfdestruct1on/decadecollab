@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 )
-
 //sdelai logger :D
 func CreateUsersTable(conn *pgx.Conn) error {
     query := `
