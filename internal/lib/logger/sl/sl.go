@@ -12,9 +12,23 @@ func Debug(msg string) {
 	logger.Debug(msg)
 }
 
+//функции *Opts принимают не только строку/ошибку, но и атрибуты
+
+func DebugOpts(msg string, opts *slog.HandlerOptions) {
+	logger := slog.New(prettylog.NewHandler(opts))
+
+	logger.Debug(msg)
+}
+
 
 func Info(msg string) {
 	logger := slog.New(prettylog.NewHandler(nil))
+
+	logger.Info(msg)
+}
+
+func InfoOpts(msg string, opts *slog.HandlerOptions) {
+	logger := slog.New(prettylog.NewHandler(opts))
 
 	logger.Info(msg)
 }
@@ -25,12 +39,16 @@ func Err(err error){
 	logger.Error("We have some problems", "error", err)
 }
 
-func ErrWithOpts(err error){     //логгирование ошибок с атрибутами
+
+//эта функция тест обработки ошибки с атрибутами
+//на ReplaceAttr происходит перезапись стандартных аттрибутов нашими
+//если a.Key пустой, то не делаем ничего 
+func TestErrOpts(err error, ){     
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 		AddSource: true,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr{  //здесь происходит перезапись стандартных аттрибутов нашими
-			if a.Key == "nothing"{								//если ничего нет, то и перезаписывать ничего не надо	
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr{  
+			if a.Key == "nothing"{								
 				return slog.Attr{}
 			}
 			return a

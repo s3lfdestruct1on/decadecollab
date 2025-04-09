@@ -9,7 +9,8 @@ import (
 	"strconv"
 	"sync"
 )
-
+// коды для назначения цвета
+// цветов создано больше чем использовано, на случай если понадобится их поменять
 const (
 	reset = "\033[0m"
 
@@ -30,57 +31,62 @@ const (
 	lightCyan    = 96
 	white        = 97
 )
-// коды для назначения цвета
-// цветов создано больше чем использовано, на случай если понадобится их поменять
 
 
+// функция окрашивания строки, использована вместо пакета color 
 func colorize(colorCode int, v string) string {
 	return fmt.Sprintf("\033[%sm%s%s", strconv.Itoa(colorCode), v, reset)
 }
-// функция окрашивания строки, использована вместо пакета color 
 
 
+// стуктура в которую вложены:
+// slog.handler для отработки логики ручки 
+// ссылка на bytes.bufer для отлова вывода из ручки
+// mutex для избежания проблем с буфером
 type Handler struct{
 	h  slog.Handler
 	b *bytes.Buffer
 	m *sync.Mutex
 }
-// стуктура в которую вложены:
-// slog.handler для отработки логики ручки 
-// ссылка на bytes.bufer для отлова вывода из ручки
-// mutex для избежания проблем с буфером
+
 
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
 	return h.h.Enabled(ctx, level)
 }
-
-func (h *Handler) computeAttrs( //функция отвечает за правильную обработку поступивших атрибутов
+//функция отвечает за правильную обработку поступивших атрибутов
+//на h.m.Lock() происходит блокировка байтого буфера
+//на if err := h.h.Handle обработка ошибки при обращении к внутренней ручке
+//на var attrs map[string]any задаётся строковая мапа, в которую позже запишут обработанные атрибуты
+//на json.Unmarshal(h.b.Bytes(), &attrs) анмаршал атрибутов из буфера в вышезаданную мапу
+//после обработка ошибки анмаршала результатов работы внутренней ручки
+func (h *Handler) computeAttrs( 
 	ctx context.Context,
 	r slog.Record,
 ) (map[string]any, error) {
-	h.m.Lock() 					//здесь происходит блокировка байтого буфера
+	h.m.Lock() 					
 	defer func() {
-		h.b.Reset()				//затем здесь откладывается его сброс и разблокировка
+		h.b.Reset()				
 		h.m.Unlock()
 	}()
-	if err := h.h.Handle(ctx, r); err != nil { //обработка ошибки при обращении к внутренней ручке
+	if err := h.h.Handle(ctx, r); err != nil { 
 		return nil, fmt.Errorf("error when calling inner handler's Handle: %w", err)
 	}
 
-	var attrs map[string]any  	//задаётся строковая мапа, в которую позже запишут обработанные атрибуты
-	err := json.Unmarshal(h.b.Bytes(), &attrs) // анмаршал атрибутов из буфера в вышезаданную мапу
-	if err != nil { 						   // обработка ошибки анмаршала результатов работы внутренней ручки
+	var attrs map[string]any  	
+	err := json.Unmarshal(h.b.Bytes(), &attrs) 
+	if err != nil { 						   
 		return nil, fmt.Errorf("error when unmarshaling inner handler's Handle result: %w", err)
 	}
 	return attrs, nil
 }
 
-const timeFormat = "[15:04:05.000]" //в каком формате будет выводится время в логах
+//в каком формате будет выводится время в логах
+const timeFormat = "[15:04:05.000]" 
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 
 	level := r.Level.String() + ":"
-
+	//окрашивание индикации уровня логов через switch
 	switch r.Level {
 	case slog.LevelDebug:
 		level = colorize(darkGray, level)
@@ -91,30 +97,29 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	case slog.LevelError:
 		level = colorize(lightRed, level)
 	}
-	//окрашивание индикации уровня логов через switch
+	
 
 
 	attrs, err := h.computeAttrs(ctx, r)
 	if err != nil {
 		return err
 	}
-
+	//здесь обрабатываются полученные атрибуты и оформляются для вывода
 	bytes, err := json.MarshalIndent(attrs, "", "  ")
 	if err != nil {
 		return fmt.Errorf("error when marshaling attrs: %w", err)
 	}
-	// здесь обрабатываются полученные атрибуты и оформляются для вывода
+	
 
 
-
-
+	//здесь происходит вывод логов, окрашенных в указаные цвета
 	fmt.Println(
 		colorize(lightGray, r.Time.Format(timeFormat)),
 		level,
 		colorize(white, r.Message),
 		colorize(darkGray, string(bytes)),
 	)
-	//здесь происходит вывод логов, окрашенных в указаные цвета
+	
 
 	return nil
 }
@@ -129,6 +134,10 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 	return &Handler{h: h.h.WithGroup(name), b: h.b, m: h.m}
 }
 
+
+
+//убираем встрроенные выводы времени, уровня и сообщения внутреннего slog.Handler,
+//так как мы уже их выводим сами
 func suppressDefaults( 						  
 	next func([]string, slog.Attr) slog.Attr, 
 ) func([]string, slog.Attr) slog.Attr {
@@ -144,8 +153,7 @@ func suppressDefaults(
 		return next(groups, a)
 	}
 }
-//убираем встрроенные выводы времени, уровня и сообщения внутреннего slog.Handler,
-//так как мы уже их выводим сами
+
 
 
 //функция для создание ручки логгера
