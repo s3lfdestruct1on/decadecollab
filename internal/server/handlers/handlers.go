@@ -1,8 +1,9 @@
 package handlers
 
 import (
-	postgre "decadecollab/internal/storage/sql"
+	service "decadecollab/internal/services"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -13,7 +14,11 @@ func CurrentTime(c echo.Context) error {
 }
 
 func GetUser(c echo.Context) error {
+	id,err :=strconv.Atoi(c.Param("id"))
+	if err != nil{
+		panic("TODO LATER")
+	}
 	// GetUser возвращает models.User{} (обработка всех возможных ошибок происходит на стороне репозитория)
-	user := postgre.GetUser(c.Param("id"))
+	user := service.GetUser(id)
 	return c.JSON(http.StatusOK, user)
 }
