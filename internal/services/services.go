@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"decadecollab/internal/config"
 	"decadecollab/internal/models"
 	db "decadecollab/internal/storage"
@@ -27,6 +28,7 @@ func GetUserService(id int)*models.User{
 		fmt.Errorf("failed to connect to database: %w", err)
 	}
 	user,_ := postgre.GetUser(conn,id)
+	defer conn.Close(context.Background())
 
 	return user
 }
