@@ -20,9 +20,9 @@ var(
 }
 conn,_ = db.DBConn(sqlcfg)
 validate = validator.New()
-
+//TODO: (serega) поменяй во всех if err errorf на свой логгер
 )
-// создает бд
+//TODO: (anton) добавить таймстемпы
 func InitDB() error {
     query := `
 	CREATE TABLE IF NOT EXISTS users (
@@ -35,61 +35,40 @@ func InitDB() error {
     );`
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
-        return fmt.Errorf("failed to create users table: %w", err)
+        panic("serega pidor")
     }
     
     return nil
 }
 //создает пользователя с валидацей, смотреть условия
-func CreateUser(username string,password string,email string)(int,error){
+func CreateUser(u *models.User)(int,error){
+	err := validate.Struct(u)
+	if err != nil{
+		//TODO: (serega) add logger
+	}
 	
-
-	err := validate.Var(username,"required,min=6,max=20,alphanum") //от 6 до 20 чаров, символы a-z A-Z 0-9
-	if err != nil{
-		return 0, fmt.Errorf("invalid username: must be 6-20 alphanumeric characters") 
-	}
-
-	err = validate.Var(password,"required,min=4,max=25,alphanum")
-	if err != nil{
-		return 0, fmt.Errorf("Invalid password: must be 4-25 alphanumeric characters") //от 4 до 25 чаров, сиволы a-z A-Z 0-9
-	}
-
-	err = validate.Var(email,"required,email") 
-	if err != nil{
-		return 0, fmt.Errorf("Invalid email format")
-	}
 	
  	query := "INSERT INTO users (name,password,email) values($1,$2,$3) RETURNING id"
-	var id int
-	err = conn.QueryRow(context.Background(),query,username,password,email).Scan(&id)
+	
+	err = conn.QueryRow(context.Background(),query,u.Username,u.Password,u.Email).Scan(&u.Id)
 	if err != nil {
-        return 0,fmt.Errorf("failed to add user: %w", err)
+        panic("serega pidor")
     }
-	return id,nil
+	return u.Id,nil
 }
 // апдейт с валидацией полностью пользователя,смотреть условия
-func UpdateUser(id int,username string,password string,email string)error{
+func UpdateUser(id int, u *models.User)error{
 
-	err := validate.Var(username,"required,min=6,max=20,alphanum")
+	err := validate.Struct(u)
 	if err != nil{
-		return fmt.Errorf("invalid username: must be 6-20 alphanumeric characters")
-	}
-
-	err = validate.Var(password,"required,min=4,max=25,alphanum")
-	if err != nil{
-		return fmt.Errorf("Invalid password: must be 4-25 alphanumeric characters")
-	}
-
-	err = validate.Var(email,"required,email")
-	if err != nil{
-		return fmt.Errorf("Invalid email format")
+		//TODO: (serega) add logger
 	}
 
 	query := "UPDATE users SET name = $1,password = $2, email = $3 where id = $4"
 
-	_,err = conn.Exec(context.Background(),query,username,password,email,id)
+	_,err = conn.Exec(context.Background(),query,u.Username,u.Password,u.Email,id)
 	if err != nil {
-        return fmt.Errorf("failed to update user: %w", err)
+        panic("serega pidor")
     }
 	return nil
 }
@@ -98,15 +77,14 @@ func UpdateUsername(id int,username string)error{
 
 	err := validate.Var(username,"required,min=6,max=20,alphanum") //от 6 до 20 чаров, символы a-z A-Z 0-9
 	if err != nil{
-		return fmt.Errorf("invalid username: must be 6-20 alphanumeric characters")
+		panic("serega pidor")
 	}
-
 
 	query := "UPDATE users SET name = $1 where id  $2"
 
 	_,err = conn.Exec(context.Background(),query,username,id)
 	if err != nil {
-        return fmt.Errorf("failed to update username: %w", err)
+        panic("serega pidor")
     }
 	return nil
 }
@@ -118,13 +96,11 @@ func UpdatePassword(id int,password string)error{
 		return fmt.Errorf("invalid username: must be 4-25 alphanumeric characters") //от 4 до 25 чаров, сиволы a-z A-Z 0-9
 	}
 
-	
-
 	query := "UPDATE users SET password = $1 where id  $2"
 
 	_,err = conn.Exec(context.Background(),query,password,id)
 	if err != nil {
-        return fmt.Errorf("failed to update password: %w", err)
+        panic("serega pidor")
     }
 	return nil
 }
@@ -136,7 +112,6 @@ func UpdateEmail(id int,email string)error{
 	if err != nil{
 		return fmt.Errorf("invalid username: must be 4-25 alphanumeric characters")
 	}
-
 
 	query := "UPDATE users SET email = $1 where id  $2"
 
@@ -191,7 +166,7 @@ func GetUsersPaging(page int)([]models.User,error){
 	}
 	return res,nil
 }
-// возвращает всех пользователй в диапазоне from - от, to - до, e.g. from 100 to 150 вернет 50 пользователей начиная с 100
+// возвращает всех пользователй в диапазоне from - to, e.g. from 100 to 150 вернет 50 пользователей начиная с 100
 func GetUsersFromTo(from int,to int)([]models.User,error){
 	limit := to - from
 	var res []models.User
