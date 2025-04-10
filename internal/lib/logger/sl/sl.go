@@ -47,6 +47,7 @@ func ErrOpts(err error, opts *slog.HandlerOptions){
 //эта функция тест обработки ошибки с атрибутами
 //на ReplaceAttr происходит перезапись стандартных аттрибутов нашими
 //если a.Key пустой, то не делаем ничего 
+/*
 func TestErrOpts(err error){     
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -62,4 +63,4 @@ func TestErrOpts(err error){
 	logger := slog.New(prettylog.NewHandler(opts)) //вместо nil указываются аттрибуты
 
 	logger.Error("We have some problems", "error", err)
-}
+*/
