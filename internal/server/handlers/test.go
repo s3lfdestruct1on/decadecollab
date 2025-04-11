@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"decadecollab/internal/lib/logger/prettylog"
-	//"decadecollab/internal/lib/logger/sl"
 	"log/slog"
 	"net/http"
 	"time"
