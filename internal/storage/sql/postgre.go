@@ -3,11 +3,17 @@ package postgre
 import (
 	"context"
 	"decadecollab/internal/config"
+	"decadecollab/internal/lib/logger/prettylog"
 	"decadecollab/internal/models"
-	"fmt"
+	db "decadecollab/internal/storage"
+	"errors"
+
+	//"fmt"
+	"log/slog"
 	"os"
-	"github.com/go-playground/validator/v10" 
-		db "decadecollab/internal/storage"
+
+	"github.com/go-playground/validator/v10"
+	//"github.com/labstack/gommon/log"
 )
 
 
@@ -17,11 +23,18 @@ var(
 	Username: os.Getenv("USERDB"),
 	Password: os.Getenv("PASS"),
 	Database: os.Getenv("DB"),
-}
-conn,_ = db.DBConn(sqlcfg)
-validate = validator.New()
-//TODO: (serega) поменяй во всех if err errorf на свой логгер
+	}
+
+    loggatrr = slog.HandlerOptions{
+	AddSource: true,
+	}
+	logg = slog.New(prettylog.NewHandler(&loggatrr))
+
+    conn,_ = db.DBConn(sqlcfg)
+    validate = validator.New()
+
 )
+//TODO: (serega) поменяй во всех if err errorf на свой логгер
 //TODO: (anton) добавить таймстемпы
 func InitDB() error {
     query := `
@@ -35,7 +48,8 @@ func InitDB() error {
     );`
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
-        panic("serega pidor")
+        logg.Error("unable to connect to db", "error", err.Error())
+		return errors.New("gg")
     }
     
     return nil
@@ -44,15 +58,18 @@ func InitDB() error {
 func CreateUser(u *models.User)(int,error){
 	err := validate.Struct(u)
 	if err != nil{
-		//TODO: (serega) add logger
+		logg.Error("user is not valid", "error", err.Error())
+		return u.Id, err
 	}
 	
 	
- 	query := "INSERT INTO users (name,password,email) values($1,$2,$3) RETURNING id"
+ 	
+	query := "INSERT INTO users (name,password,email) values($1,$2,$3) RETURNING id"
 	
 	err = conn.QueryRow(context.Background(),query,u.Username,u.Password,u.Email).Scan(&u.Id)
 	if err != nil {
-        panic("serega pidor")
+        logg.Error("cannot create user", "error", err.Error())
+		return u.Id, err
     }
 	return u.Id,nil
 }
@@ -61,14 +78,16 @@ func UpdateUser(id int, u *models.User)error{
 
 	err := validate.Struct(u)
 	if err != nil{
-		//TODO: (serega) add logger
+		logg.Error("user is not valid", "error", err.Error())
+		return err
 	}
 
 	query := "UPDATE users SET name = $1,password = $2, email = $3 where id = $4"
 
 	_,err = conn.Exec(context.Background(),query,u.Username,u.Password,u.Email,id)
 	if err != nil {
-        panic("serega pidor")
+        logg.Error("cannot update user", "error", err.Error())		
+		return err
     }
 	return nil
 }
@@ -77,14 +96,16 @@ func UpdateUsername(id int,username string)error{
 
 	err := validate.Var(username,"required,min=6,max=20,alphanum") //от 6 до 20 чаров, символы a-z A-Z 0-9
 	if err != nil{
-		panic("serega pidor")
+		logg.Error("invalid username", "error", err.Error())
+		return err
 	}
 
 	query := "UPDATE users SET name = $1 where id  $2"
 
 	_,err = conn.Exec(context.Background(),query,username,id)
 	if err != nil {
-        panic("serega pidor")
+        logg.Error("cannot update user", "error", err.Error())
+		return err
     }
 	return nil
 }
@@ -93,14 +114,15 @@ func UpdatePassword(id int,password string)error{
 
 	err := validate.Var(password,"required,min=4,max=25,alphanum")
 	if err != nil{
-		return fmt.Errorf("invalid username: must be 4-25 alphanumeric characters") //от 4 до 25 чаров, сиволы a-z A-Z 0-9
+		logg.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error())
+		//от 4 до 25 чаров, сиволы a-z A-Z 0-9
 	}
 
 	query := "UPDATE users SET password = $1 where id  $2"
 
 	_,err = conn.Exec(context.Background(),query,password,id)
 	if err != nil {
-        panic("serega pidor")
+        logg.Error("cannot update password", "error", err.Error())
     }
 	return nil
 }
@@ -110,14 +132,14 @@ func UpdateEmail(id int,email string)error{
 
 	err := validate.Var(email,"required,email")
 	if err != nil{
-		return fmt.Errorf("invalid username: must be 4-25 alphanumeric characters")
+		logg.Error("invalid email", "error", err.Error())
 	}
 
 	query := "UPDATE users SET email = $1 where id  $2"
 
 	_,err = conn.Exec(context.Background(),query,email,id)
 	if err != nil {
-        return fmt.Errorf("failed to update email: %w", err)
+        logg.Error("cannot update email", "error", err.Error())
     }
 	return nil
 }
@@ -129,7 +151,7 @@ func DeleteUser(id int)error{
 
 	_,err := conn.Exec(context.Background(),query,id)
 	if err != nil{
-		return fmt.Errorf("user not found: %w", err)
+		logg.Error("user not found", "error", err.Error())
 	}
 	return nil
 }
@@ -140,7 +162,7 @@ func GetUser(id int) (*models.User,error){
 
 	err := conn.QueryRow(context.Background(),query,id).Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 	if err != nil{
-		return nil,fmt.Errorf("user not found: %w", err)
+		logg.Error("user not found", "error", err.Error())
 	}
 	return &user,nil
 }
@@ -153,14 +175,16 @@ func GetUsersPaging(page int)([]models.User,error){
 
 	rows,err := conn.Query(context.Background(),query,pagesize,offset)
 	if err != nil{
-		return nil, fmt.Errorf("failed to run query: %w",err)
+		logg.Error("failed to run query", "error", err.Error())
+		return nil, err
 	}
 
 	for rows.Next(){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 		if err != nil{
-			return nil,fmt.Errorf("failed to scan user %w",err)
+			logg.Error("failed to scan user", "error", err.Error())
+			return nil, err
 		}
 		res = append(res, user)
 	}
@@ -174,13 +198,15 @@ func GetUsersFromTo(from int,to int)([]models.User,error){
 
 	rows,err := conn.Query(context.Background(),query,limit,from)
 	if err != nil{
-		return nil, fmt.Errorf("failed to run query: %w",err)
+		logg.Error("failed to run query", "error", err.Error())
+		return nil, err
 	}
 	for rows.Next(){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 		if err != nil{
-			return nil,fmt.Errorf("failed to scan user %w",err)
+			logg.Error("failed to scan user", "error", err.Error())
+			return nil, err
 		}
 		res = append(res, user)
 	}

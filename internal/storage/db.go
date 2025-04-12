@@ -3,13 +3,22 @@ package db
 import (
 	"context"
 	"decadecollab/internal/config"
+	"decadecollab/internal/lib/logger/prettylog"
+	"log/slog"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
 )
-
+var(
+	loggatrr = slog.HandlerOptions{
+		AddSource: true,
+	}
+	logg = slog.New(prettylog.NewHandler(&loggatrr))
+)
 //logger sdelai :-)
 func DBConn(cfg config.PSQLConfig) (*pgx.Conn,error){
+	
+	
 	usr := cfg.Username
 	pass := cfg.Password
 	db := cfg.Database
@@ -19,7 +28,8 @@ func DBConn(cfg config.PSQLConfig) (*pgx.Conn,error){
 	
 	conn,err := pgx.Connect(context.Background(),strConn)
 	if err != nil {
-        return nil, fmt.Errorf("failed to connect to database: %w", err)
+       logg.Error("failed to connect to database","error", err.Error())
+	   return nil, err	
     }
 	return conn,nil
 }
