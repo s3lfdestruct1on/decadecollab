@@ -4,7 +4,6 @@ import (
 	"decadecollab/internal/config"
 	"decadecollab/internal/lib/logger/prettylog"
 	"decadecollab/internal/models"
-	postgre "decadecollab/internal/storage/sql"
 	"log/slog"
 
 	"decadecollab/internal/server/handlers"
