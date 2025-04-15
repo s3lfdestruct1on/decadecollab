@@ -3,13 +3,14 @@ package postgre
 import (
 	"context"
 	"decadecollab/internal/config"
-	"decadecollab/internal/lib/logger/prettylog"
+	"decadecollab/internal/lib/logger/sl"
 	"decadecollab/internal/models"
 	db "decadecollab/internal/storage"
 	"errors"
 	"time"
 
 	"log/slog"
+	//"fmt"
 	"os"
 
 	"github.com/go-playground/validator/v10"
@@ -24,10 +25,7 @@ var(
 	Database: os.Getenv("DB"),
 	}
 
-    loggatrr = slog.HandlerOptions{
-	AddSource: true,
-	}
-	logg = slog.New(prettylog.NewHandler(&loggatrr))
+   
 
     conn,_ = db.DBConn(sqlcfg)
     validate = validator.New()
@@ -36,37 +34,47 @@ var(
 //TODO: (serega) поменяй во всех if err errorf на свой логгер
 //TODO: (anton) добавить таймстемпы
 func InitDB() error {
-    query := `
+	query := `
+	CREATE OR REPLACE FUNCTION create_rolenametype() RETURNS void AS $$
+	BEGIN
+		IF NOT EXISTS(
+			SELECT 1
+			FROM pg_type
+			WHERE typname = 'rolename'
+			AND   typtype = 'e'
+		) THEN
+		 	CREATE TYPE ROLENAME AS ENUM ('customer','manager','admin');
+		END IF;
+	END;
+	$$ LANGUAGE plpgsql;`
+	_, err := conn.Exec(context.Background(), query)
+    if err != nil {
+        sl.PLogger.Error("unable to init db at 1 part", "error", err.Error())
+		return errors.New("gg")
+    }
+	
+	query = `SELECT create_rolenametype();`
+    _, err = conn.Exec(context.Background(), query)
+    if err != nil {
+        sl.PLogger.Error("unable to init db at 2 part", "error", err.Error())
+		return errors.New("gg")
+    }
+    
+	
+	query = `
 	CREATE TABLE IF NOT EXISTS users (
         id BIGSERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         password VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
-		created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		updated_at timestamp
+		last_active TIMESTAMP,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		role ROLENAME DEFAULT 'customer'
     );`
-    _, err := conn.Exec(context.Background(), query)
+    _, err = conn.Exec(context.Background(), query)
     if err != nil {
-        logg.Error("unable to connect to db", "error", err.Error())
-		return errors.New("gg")
-    }
-    
-    return nil
-}
-// создает таблицу с корзинами товаров для юзеров 
-func InitBasketDB() error {
-    query := `
-	CREATE TABLE IF NOT EXISTS baskets (
-        id BIGSERIAL PRIMARY KEY,
-        user_id BIGINT NOT NULL,
-        item_id BIGINT,
-        quantity SMALLINT,
-		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
-    );`
-    _, err := conn.Exec(context.Background(), query)
-    if err != nil {
-        logg.Error("failed to create basket db", "error", err.Error())
+        sl.PLogger.Error("unable to init db at 3 part", "error", err.Error())
 		return errors.New("gg")
     }
     
@@ -75,35 +83,55 @@ func InitBasketDB() error {
 
 func InitItemsDB() error {
     query := `
-	CREATE TABLE IF NOT EXISTS items (
+  		CREATE TABLE IF NOT EXISTS items (
         id BIGSERIAL PRIMARY KEY,
         title varchar(255) NOT NULL,
         price DECIMAL(10,2),
-		salepercent smallint,
+    	salepercent smallint,
         stock SMALLINT,
-		description TEXT,
-    	tags TEXT
+    	description TEXT,
+      	tags TEXT
     );`
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
-        logg.Error("unable to create items db", "error", err.Error())
-		return errors.New("gg")
+        sl.PLogger.Error("unable to create items db", "error", err.Error())
+    return errors.New("gg")
+    }
+	return nil
+}
+func InitBasketDB() error {
+    query := `
+  		CREATE TABLE IF NOT EXISTS baskets (
+        id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        item_id BIGINT,
+        quantity SMALLINT,
+    	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+    );`
+    _, err := conn.Exec(context.Background(), query)
+    if err != nil {
+        sl.PLogger.Error("failed to create basket db", "error", err.Error())
+    return errors.New("gg")
     }
     
     return nil
 }
+
+
+
 //создает пользователя с валидацей, смотреть условия
 func CreateUser(u *models.User)(int,error){
 	err := validate.Struct(u)
 	if err != nil{
-		logg.Error("user is not valid", "error", err.Error())
+		sl.PLogger.Error("user is not valid", "error", err.Error())
 		return u.Id, err
 	}
 	query := "INSERT INTO users (name,password,email) values($1,$2,$3) RETURNING id"
 	
 	err = conn.QueryRow(context.Background(),query,u.Username,u.Password,u.Email).Scan(&u.Id)
 	if err != nil {
-        logg.Error("cannot create user", "error", err.Error())
+        sl.PLogger.Error("cannot create user", "error", err.Error())
 		return u.Id, err
     }
 	return u.Id,nil
@@ -114,7 +142,7 @@ func UpdateUser(id int, u *models.User)error{
 
 	err := validate.Struct(u)
 	if err != nil{
-		logg.Error("user is not valid", "error", err.Error())
+		sl.PLogger.Error("user is not valid", "error", err.Error())
 		return err
 	}
 
@@ -122,7 +150,7 @@ func UpdateUser(id int, u *models.User)error{
 
 	_,err = conn.Exec(context.Background(),query,u.Username,u.Password,u.Email,now,id)
 	if err != nil {
-        logg.Error("cannot update user", "error", err.Error())		
+        sl.PLogger.Error("cannot update user", "error", err.Error())		
 		return err
     }
 	return nil
@@ -133,7 +161,7 @@ func UpdateUsername(id int,username string)error{
 
 	err := validate.Var(username,"required,min=6,max=20,alphanum") //от 6 до 20 чаров, символы a-z A-Z 0-9
 	if err != nil{
-		logg.Error("invalid username", "error", err.Error())
+		sl.PLogger.Error("invalid username", "error", err.Error())
 		return err
 	}
 
@@ -141,7 +169,7 @@ func UpdateUsername(id int,username string)error{
 
 	_,err = conn.Exec(context.Background(),query,username,now,id)
 	if err != nil {
-        logg.Error("cannot update user", "error", err.Error())
+        sl.PLogger.Error("cannot update user", "error", err.Error())
 		return err
     }
 	return nil
@@ -153,13 +181,15 @@ func UpdatePassword(id int,password string)error{
 	err := validate.Var(password,"required,min=4,max=25,alphanum")
 	if err != nil{
 		logg.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error())//от 4 до 25 чаров, сиволы a-z A-Z 0-9
+		sl.PLogger.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error())
+		//от 4 до 25 чаров, сиволы a-z A-Z 0-9
 	}
 
 	query := "UPDATE users SET password = $1,updated_at = $2 where id = $3"
 
 	_,err = conn.Exec(context.Background(),query,password,now,id)
 	if err != nil {
-        logg.Error("cannot update password", "error", err.Error())
+        sl.PLogger.Error("cannot update password", "error", err.Error())
     }
 	return nil
 }
@@ -170,14 +200,14 @@ func UpdateEmail(id int,email string)error{
 
 	err := validate.Var(email,"required,email")
 	if err != nil{
-		logg.Error("invalid email", "error", err.Error())
+		sl.PLogger.Error("invalid email", "error", err.Error())
 	}
 
 	query := "UPDATE users SET email = $1, updated_at = $2 where id = $3"
 
 	_,err = conn.Exec(context.Background(),query,email,now,id)
 	if err != nil {
-        logg.Error("cannot update email", "error", err.Error())
+        sl.PLogger.Error("cannot update email", "error", err.Error())
     }
 	return nil
 }
@@ -189,7 +219,7 @@ func DeleteUser(id int)error{
 
 	_,err := conn.Exec(context.Background(),query,id)
 	if err != nil{
-		logg.Error("user not found", "error", err.Error())
+		sl.PLogger.Error("user not found", "error", err.Error())
 	}
 	return nil
 }
@@ -200,7 +230,7 @@ func GetUser(id int) (*models.User,error){
 
 	err := conn.QueryRow(context.Background(),query,id).Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 	if err != nil{
-		logg.Error("user not found", "error", err.Error())
+		sl.PLogger.Error("user not found", "error", err.Error())
 	}
 	return &user,nil
 }
@@ -213,7 +243,7 @@ func GetUsersPaging(page int)([]models.User,error){
 
 	rows,err := conn.Query(context.Background(),query,pagesize,offset)
 	if err != nil{
-		logg.Error("failed to run query", "error", err.Error())
+		sl.PLogger.Error("failed to run query", "error", err.Error())
 		return nil, err
 	}
 
@@ -221,7 +251,7 @@ func GetUsersPaging(page int)([]models.User,error){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 		if err != nil{
-			logg.Error("failed to scan user", "error", err.Error())
+			sl.PLogger.Error("failed to scan user", "error", err.Error())
 			return nil, err
 		}
 		res = append(res, user)
@@ -236,14 +266,14 @@ func GetUsersFromTo(from int,to int)([]models.User,error){
 
 	rows,err := conn.Query(context.Background(),query,limit,from)
 	if err != nil{
-		logg.Error("failed to run query", "error", err.Error())
+		sl.PLogger.Error("failed to run query", "error", err.Error())
 		return nil, err
 	}
 	for rows.Next(){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 		if err != nil{
-			logg.Error("failed to scan user", "error", err.Error())
+			sl.PLogger.Error("failed to scan user", "error", err.Error())
 			return nil, err
 		}
 		res = append(res, user)
