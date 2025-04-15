@@ -5,7 +5,24 @@ import (
 	"log/slog"
 	//"errors"
 )
+
 //функции *Opts принимают не только строку/ошибку, но и атрибуты
+
+
+
+
+var (
+	
+	PLogerratr = slog.HandlerOptions{
+	  AddSource: true,
+  }
+	PLogger = slog.New(prettylog.NewHandler(&PLogerratr))
+)
+
+
+
+
+
 
 func Debug(msg string) {
 	logger := slog.New(prettylog.NewHandler(nil))

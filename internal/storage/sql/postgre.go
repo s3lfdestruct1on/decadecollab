@@ -3,13 +3,12 @@ package postgre
 import (
 	"context"
 	"decadecollab/internal/config"
-	"decadecollab/internal/lib/logger/prettylog"
+	"decadecollab/internal/lib/logger/sl"
 	"decadecollab/internal/models"
 	db "decadecollab/internal/storage"
 	"errors"
 
 	//"fmt"
-	"log/slog"
 	"os"
 
 	"github.com/go-playground/validator/v10"
@@ -25,10 +24,7 @@ var(
 	Database: os.Getenv("DB"),
 	}
 
-    loggatrr = slog.HandlerOptions{
-	AddSource: true,
-	}
-	logg = slog.New(prettylog.NewHandler(&loggatrr))
+   
 
     conn,_ = db.DBConn(sqlcfg)
     validate = validator.New()
@@ -48,7 +44,7 @@ func InitDB() error {
     );`
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
-        logg.Error("unable to connect to db", "error", err.Error())
+        sl.PLogger.Error("unable to connect to db", "error", err.Error())
 		return errors.New("gg")
     }
     
@@ -58,7 +54,7 @@ func InitDB() error {
 func CreateUser(u *models.User)(int,error){
 	err := validate.Struct(u)
 	if err != nil{
-		logg.Error("user is not valid", "error", err.Error())
+		sl.PLogger.Error("user is not valid", "error", err.Error())
 		return u.Id, err
 	}
 	
@@ -68,7 +64,7 @@ func CreateUser(u *models.User)(int,error){
 	
 	err = conn.QueryRow(context.Background(),query,u.Username,u.Password,u.Email).Scan(&u.Id)
 	if err != nil {
-        logg.Error("cannot create user", "error", err.Error())
+        sl.PLogger.Error("cannot create user", "error", err.Error())
 		return u.Id, err
     }
 	return u.Id,nil
@@ -78,7 +74,7 @@ func UpdateUser(id int, u *models.User)error{
 
 	err := validate.Struct(u)
 	if err != nil{
-		logg.Error("user is not valid", "error", err.Error())
+		sl.PLogger.Error("user is not valid", "error", err.Error())
 		return err
 	}
 
@@ -86,7 +82,7 @@ func UpdateUser(id int, u *models.User)error{
 
 	_,err = conn.Exec(context.Background(),query,u.Username,u.Password,u.Email,id)
 	if err != nil {
-        logg.Error("cannot update user", "error", err.Error())		
+        sl.PLogger.Error("cannot update user", "error", err.Error())		
 		return err
     }
 	return nil
@@ -96,7 +92,7 @@ func UpdateUsername(id int,username string)error{
 
 	err := validate.Var(username,"required,min=6,max=20,alphanum") //от 6 до 20 чаров, символы a-z A-Z 0-9
 	if err != nil{
-		logg.Error("invalid username", "error", err.Error())
+		sl.PLogger.Error("invalid username", "error", err.Error())
 		return err
 	}
 
@@ -104,7 +100,7 @@ func UpdateUsername(id int,username string)error{
 
 	_,err = conn.Exec(context.Background(),query,username,id)
 	if err != nil {
-        logg.Error("cannot update user", "error", err.Error())
+        sl.PLogger.Error("cannot update user", "error", err.Error())
 		return err
     }
 	return nil
@@ -114,7 +110,7 @@ func UpdatePassword(id int,password string)error{
 
 	err := validate.Var(password,"required,min=4,max=25,alphanum")
 	if err != nil{
-		logg.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error())
+		sl.PLogger.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error())
 		//от 4 до 25 чаров, сиволы a-z A-Z 0-9
 	}
 
@@ -122,7 +118,7 @@ func UpdatePassword(id int,password string)error{
 
 	_,err = conn.Exec(context.Background(),query,password,id)
 	if err != nil {
-        logg.Error("cannot update password", "error", err.Error())
+        sl.PLogger.Error("cannot update password", "error", err.Error())
     }
 	return nil
 }
@@ -132,14 +128,14 @@ func UpdateEmail(id int,email string)error{
 
 	err := validate.Var(email,"required,email")
 	if err != nil{
-		logg.Error("invalid email", "error", err.Error())
+		sl.PLogger.Error("invalid email", "error", err.Error())
 	}
 
 	query := "UPDATE users SET email = $1 where id  $2"
 
 	_,err = conn.Exec(context.Background(),query,email,id)
 	if err != nil {
-        logg.Error("cannot update email", "error", err.Error())
+        sl.PLogger.Error("cannot update email", "error", err.Error())
     }
 	return nil
 }
@@ -151,7 +147,7 @@ func DeleteUser(id int)error{
 
 	_,err := conn.Exec(context.Background(),query,id)
 	if err != nil{
-		logg.Error("user not found", "error", err.Error())
+		sl.PLogger.Error("user not found", "error", err.Error())
 	}
 	return nil
 }
@@ -162,7 +158,7 @@ func GetUser(id int) (*models.User,error){
 
 	err := conn.QueryRow(context.Background(),query,id).Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 	if err != nil{
-		logg.Error("user not found", "error", err.Error())
+		sl.PLogger.Error("user not found", "error", err.Error())
 	}
 	return &user,nil
 }
@@ -175,7 +171,7 @@ func GetUsersPaging(page int)([]models.User,error){
 
 	rows,err := conn.Query(context.Background(),query,pagesize,offset)
 	if err != nil{
-		logg.Error("failed to run query", "error", err.Error())
+		sl.PLogger.Error("failed to run query", "error", err.Error())
 		return nil, err
 	}
 
@@ -183,7 +179,7 @@ func GetUsersPaging(page int)([]models.User,error){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 		if err != nil{
-			logg.Error("failed to scan user", "error", err.Error())
+			sl.PLogger.Error("failed to scan user", "error", err.Error())
 			return nil, err
 		}
 		res = append(res, user)
@@ -198,14 +194,14 @@ func GetUsersFromTo(from int,to int)([]models.User,error){
 
 	rows,err := conn.Query(context.Background(),query,limit,from)
 	if err != nil{
-		logg.Error("failed to run query", "error", err.Error())
+		sl.PLogger.Error("failed to run query", "error", err.Error())
 		return nil, err
 	}
 	for rows.Next(){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
 		if err != nil{
-			logg.Error("failed to scan user", "error", err.Error())
+			sl.PLogger.Error("failed to scan user", "error", err.Error())
 			return nil, err
 		}
 		res = append(res, user)

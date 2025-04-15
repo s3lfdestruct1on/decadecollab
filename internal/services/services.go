@@ -1,23 +1,17 @@
 package service
 
 import (
-	"decadecollab/internal/lib/logger/prettylog"
+	"decadecollab/internal/lib/logger/sl"
 	"decadecollab/internal/models"
-	"log/slog"
 
 	postgre "decadecollab/internal/storage/sql"
 	//"fmt"
 )
-var(
-		loggatrr = slog.HandlerOptions{
-		AddSource: true,
-		}
-		logg = slog.New(prettylog.NewHandler(&loggatrr))
-)
+
 // возвращает одного юзера по айди
 func GetUser(id int)*models.User{
 	if id <= 0{
-		logg.Error("invalid id")
+		sl.PLogger.Error("invalid id")
 	}
 
 	user,_ := postgre.GetUser(id)
