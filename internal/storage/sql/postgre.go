@@ -9,8 +9,6 @@ import (
 	"errors"
 	"time"
 
-	"log/slog"
-	//"fmt"
 	"os"
 
 	"github.com/go-playground/validator/v10"
@@ -31,48 +29,32 @@ var(
     validate = validator.New()
 
 )
-//TODO: (serega) поменяй во всех if err errorf на свой логгер
-//TODO: (anton) добавить таймстемпы
+
 func InitDB() error {
 	query := `
-	CREATE OR REPLACE FUNCTION create_rolenametype() RETURNS void AS $$
-	BEGIN
-		IF NOT EXISTS(
-			SELECT 1
-			FROM pg_type
-			WHERE typname = 'rolename'
-			AND   typtype = 'e'
-		) THEN
-		 	CREATE TYPE ROLENAME AS ENUM ('customer','manager','admin');
-		END IF;
-	END;
-	$$ LANGUAGE plpgsql;`
-	_, err := conn.Exec(context.Background(), query)
-    if err != nil {
-        sl.PLogger.Error("unable to init db at 1 part", "error", err.Error())
-		return errors.New("gg")
-    }
+	DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_type
+            WHERE typname = 'rolename'
+            AND   typtype = 'e'
+        ) THEN
+            CREATE TYPE rolename AS ENUM ('customer', 'manager', 'admin');
+        END IF;
+    END $$;
 	
-	query = `SELECT create_rolenametype();`
-    _, err = conn.Exec(context.Background(), query)
-    if err != nil {
-        sl.PLogger.Error("unable to init db at 2 part", "error", err.Error())
-		return errors.New("gg")
-    }
-    
-	
-	query = `
 	CREATE TABLE IF NOT EXISTS users (
-        id BIGSERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
+        id 			BIGSERIAL PRIMARY KEY,
+        name 		VARCHAR(255) NOT NULL,
+        password	VARCHAR(255) NOT NULL,
+        email 		VARCHAR(255) UNIQUE NOT NULL,
 		last_active TIMESTAMP,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		role ROLENAME DEFAULT 'customer'
+		created_at 	TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		updated_at 	TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		role 		ROLENAME DEFAULT 'customer'
     );`
-    _, err = conn.Exec(context.Background(), query)
+    _, err := conn.Exec(context.Background(), query)
     if err != nil {
         sl.PLogger.Error("unable to init db at 3 part", "error", err.Error())
 		return errors.New("gg")
@@ -84,13 +66,13 @@ func InitDB() error {
 func InitItemsDB() error {
     query := `
   		CREATE TABLE IF NOT EXISTS items (
-        id BIGSERIAL PRIMARY KEY,
-        title varchar(255) NOT NULL,
-        price DECIMAL(10,2),
-    	salepercent smallint,
-        stock SMALLINT,
-    	description TEXT,
-      	tags TEXT
+        id 				BIGSERIAL PRIMARY KEY,
+        title 			varchar(255) NOT NULL,
+        price 			DECIMAL(10,2),
+    	sale_percent 	smallint,
+        stock 			SMALLINT,
+    	description 	TEXT,
+      	tags 			TEXT
     );`
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
@@ -99,13 +81,14 @@ func InitItemsDB() error {
     }
 	return nil
 }
+
 func InitBasketDB() error {
     query := `
   		CREATE TABLE IF NOT EXISTS baskets (
-        id BIGSERIAL PRIMARY KEY,
-        user_id BIGINT NOT NULL,
-        item_id BIGINT,
-        quantity SMALLINT,
+        id 			BIGSERIAL PRIMARY KEY,
+        user_id 	BIGINT NOT NULL,
+        item_id 	BIGINT,
+        quantity 	SMALLINT,
     	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
     );`
@@ -118,6 +101,59 @@ func InitBasketDB() error {
     return nil
 }
 
+func InitOrderItemsDB() error {
+    query := `
+  		CREATE TABLE IF NOT EXISTS order_items (
+        id 			BIGINT PRIMARY KEY,
+    	order_id 	BIGINT NOT NULL,
+    	item_id 	BIGINT NOT NULL,
+    	quantity 	INTEGER NOT NULL,
+    	unit_price 	DECIMAL(10, 2) NOT NULL,
+    	FOREIGN KEY (order_id) REFERENCES orders(id),
+    	FOREIGN KEY (item_id) REFERENCES items(id)
+    );`
+    _, err := conn.Exec(context.Background(), query)
+    if err != nil {
+        sl.PLogger.Error("failed to create order_items db", "error", err.Error())
+    return errors.New("gg")
+    }
+    return nil
+}
+
+func InitOrderDB() error {
+	query := `
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_type
+            WHERE typname = 'status'
+            AND   typtype = 'e'
+        ) THEN
+            CREATE TYPE status AS ENUM ('created', 'payed', 'shipping','delivered');
+        END IF;
+    END $$;
+
+    CREATE TABLE IF NOT EXISTS orders (
+        id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        total_amount DECIMAL(10, 2) NOT NULL,
+        shipping_address TEXT NOT NULL,
+        delivery_date TIMESTAMP,
+        status status DEFAULT 'created',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    `
+	_, err := conn.Exec(context.Background(), query)
+    if err != nil {
+        sl.PLogger.Error("failed to create order db", "error", err.Error())
+		return errors.New("gg")
+    }
+
+    return nil
+}
 
 
 //создает пользователя с валидацей, смотреть условия
@@ -180,9 +216,7 @@ func UpdatePassword(id int,password string)error{
 
 	err := validate.Var(password,"required,min=4,max=25,alphanum")
 	if err != nil{
-		logg.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error())//от 4 до 25 чаров, сиволы a-z A-Z 0-9
-		sl.PLogger.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error())
-		//от 4 до 25 чаров, сиволы a-z A-Z 0-9
+		sl.PLogger.Error("invalid password: must be 4-25 alphanumeric characters", "error", err.Error()) //от 4 до 25 чаров, сиволы a-z A-Z 0-9
 	}
 
 	query := "UPDATE users SET password = $1,updated_at = $2 where id = $3"
