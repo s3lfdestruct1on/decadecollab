@@ -80,6 +80,44 @@ func InitDB() error {
     return nil
 }
 
+func InitItemsDB() error {
+    query := `
+  		CREATE TABLE IF NOT EXISTS items (
+        id BIGSERIAL PRIMARY KEY,
+        title varchar(255) NOT NULL,
+        price DECIMAL(10,2),
+    	salepercent smallint,
+        stock SMALLINT,
+    	description TEXT,
+      	tags TEXT
+    );`
+    _, err := conn.Exec(context.Background(), query)
+    if err != nil {
+        sl.PLogger.Error("unable to create items db", "error", err.Error())
+    return errors.New("gg")
+    }
+	return nil
+}
+func InitBasketDB() error {
+    query := `
+  		CREATE TABLE IF NOT EXISTS baskets (
+        id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        item_id BIGINT,
+        quantity SMALLINT,
+    	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+    );`
+    _, err := conn.Exec(context.Background(), query)
+    if err != nil {
+        sl.PLogger.Error("failed to create basket db", "error", err.Error())
+    return errors.New("gg")
+    }
+    
+    return nil
+}
+
+
 
 //создает пользователя с валидацей, смотреть условия
 func CreateUser(u *models.User)(int,error){
