@@ -15,7 +15,7 @@ func CurrentTime(c echo.Context) error {
 }
 
 func GetUser(c echo.Context) error {
-	id,err :=strconv.Atoi(c.Param("id"))
+	id,err := strconv.ParseInt(c.Param("id"),10,64)
 	if err != nil{
 		sl.PLogger.Error("user not found", "error", err.Error())
 	}
