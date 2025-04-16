@@ -69,7 +69,7 @@ func InitItemsDB() error {
         id 				BIGSERIAL PRIMARY KEY,
         title 			varchar(255) NOT NULL,
         price 			DECIMAL(10,2),
-    	sale_percent 	smallint,
+    	sale_percent 	SMALLINT,
         stock 			SMALLINT,
     	description 	TEXT,
       	tags 			TEXT
@@ -280,7 +280,7 @@ func GetUsersPaging(page int)([]models.User,error){
 		sl.PLogger.Error("failed to run query", "error", err.Error())
 		return nil, err
 	}
-
+	defer rows.Close()
 	for rows.Next(){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
@@ -303,6 +303,7 @@ func GetUsersFromTo(from int,to int)([]models.User,error){
 		sl.PLogger.Error("failed to run query", "error", err.Error())
 		return nil, err
 	}
+	defer rows.Close()
 	for rows.Next(){
 		user := models.User{}
 		err := rows.Scan(&user.Id,&user.Username,&user.Password,&user.Email)
@@ -415,5 +416,139 @@ func UpdateItemDesc(id int64, itemdesc string)error{
 		   return err
 	   }
 	   return nil
-   
+}
+//добавляет товар по item_id в корзину пользователя по user_id с проверкой стока 
+func AddItemToBasket(item_id int64,user_id int64)error{
+	tx, err := conn.Begin(context.Background())
+	defer tx.Rollback(context.Background())
+    
+    var stock int16
+    err = tx.QueryRow(context.Background(), `
+        SELECT stock
+        FROM items
+        WHERE id = $1
+        FOR UPDATE;
+    `, item_id).Scan(&stock)
+	if stock < 1{
+		sl.PLogger.Error("insufficient stock")
+		return err
+	}
+
+    if err != nil {
+        sl.PLogger.Error("failed to check item availability: %w", err)
+		return err
+    }
+
+    _, err = tx.Exec(context.Background(), `
+        INSERT INTO baskets (user_id, item_id, quantity)
+        VALUES ($1, $2, 1)
+        ON CONFLICT (user_id, item_id) DO UPDATE
+        SET quantity = baskets.quantity + 1;
+    `, user_id, item_id)
+
+    if err != nil {
+        sl.PLogger.Error("failed to add item to basket: %w", err)
+		return err
+    }
+
+    // Фиксируем транзакцию
+    err = tx.Commit(context.Background())
+    if err != nil {
+        sl.PLogger.Error("failed to commit transaction: %w", err)
+		return err
+    }
+
+    sl.PLogger.Error("Added item %d to basket for user %d\n", item_id, user_id)
+    return nil
+}
+
+func RemoveItemFromBasket(user_id int64,item_id int64)error{
+    tx, err := conn.Begin(context.Background())
+    if err != nil {
+        sl.PLogger.Error("failed to begin transaction: %w", err)
+        return err
+    }
+    defer tx.Rollback(context.Background()) 
+
+    var quantity int
+    err = tx.QueryRow(context.Background(), `
+        SELECT quantity
+        FROM baskets
+        WHERE user_id = $1 AND item_id = $2
+        FOR UPDATE;
+    `, user_id, item_id).Scan(&quantity)
+
+    if err != nil {
+        sl.PLogger.Error("failed to check item in basket: %w", err)
+        return err
+    }
+    if quantity > 1 {
+         _, err = tx.Exec(context.Background(), `
+            UPDATE baskets
+            SET quantity = quantity - 1
+            WHERE user_id = $1 AND item_id = $2;
+        `, user_id, item_id)
+    } else {
+        _, err = tx.Exec(context.Background(), `
+            DELETE FROM baskets
+            WHERE user_id = $1 AND item_id = $2;
+        `, user_id, item_id)
+        }
+     
+
+    if err != nil {
+        sl.PLogger.Error("failed to update or delete item from basket: %w", err)
+        return err
+	}
+
+    err = tx.Commit(context.Background())
+    if err != nil {
+        sl.PLogger.Error("failed to commit transaction: %w", err)
+        return err
+    }
+
+    sl.PLogger.Info("Removed item %d from basket for user %d", item_id, user_id)
+    return nil
+}
+
+func GetBasketItems(user_id int64)([]models.Basket,error){
+	query := `
+        SELECT
+            b.id,
+			b.user_id,
+            b.item_id, 
+            i.title,
+            b.quantity,
+            (i.price * b.quantity) AS total_price
+        FROM baskets b
+        JOIN items i ON b.item_id = i.id
+        WHERE b.user_id = $1;
+    `
+
+    rows, err := conn.Query(context.Background(), query, user_id)
+    if err != nil {
+        sl.PLogger.Error("failed to fetch basket items: %w", err)
+        return nil, err
+    }
+    defer rows.Close()
+
+    var basketItems []models.Basket
+    for rows.Next() {
+        var basket models.Basket
+        err := rows.Scan(
+            &basket.Id,
+			&basket.UserID,
+            &basket.ItemID,
+            &basket.Title,
+            &basket.Quantity,
+            &basket.TotalPrice,
+        )
+        if err != nil {
+            sl.PLogger.Error("failed to scan basket item: %w", err)
+            return nil,err
+        }
+        basketItems = append(basketItems, basket)
+    }
+
+    return basketItems, nil
 }

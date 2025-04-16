@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+  "time"
+  "github.com/shopspring/decimal"
+)
 //TODO: review всего этого дерьма сделать
 type User struct{
   Id int64
@@ -15,8 +18,8 @@ type User struct{
 type Item struct{
   Id int64
   Title string 
-  Stock int64 
-  Price int
+  Stock int16 
+  Price decimal.Decimal
   SalePercent int16
   Tags string
   Description string
@@ -25,7 +28,8 @@ type Item struct{
 type Basket struct{
   Id int64
   UserID int64 
-  ItemID int64 
-  TotalPrice int64
+  ItemID int64
+  Title string
   Quantity int16
+  TotalPrice decimal.Decimal
 }
