@@ -16,7 +16,7 @@ type Item struct{
   Id int64
   Title string 
   Stock int64 
-  Price int16
+  Price int
   SalePercent int16
   Tags string
   Description string

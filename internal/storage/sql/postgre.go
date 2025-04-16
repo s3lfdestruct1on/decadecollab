@@ -157,7 +157,7 @@ func InitOrderDB() error {
 
 
 //создает пользователя с валидацей, смотреть условия
-func CreateUser(u *models.User)(int,error){
+func CreateUser(u *models.User)(int64,error){
 	err := validate.Struct(u)
 	if err != nil{
 		sl.PLogger.Error("user is not valid", "error", err.Error())
@@ -173,7 +173,7 @@ func CreateUser(u *models.User)(int,error){
 	return u.Id,nil
 }
 // апдейт с валидацией полностью пользователя,смотреть условия
-func UpdateUser(id int, u *models.User)error{
+func UpdateUser(id int64, u *models.User)error{
 	var now time.Time
 
 	err := validate.Struct(u)
@@ -192,7 +192,7 @@ func UpdateUser(id int, u *models.User)error{
 	return nil
 }
 // смена только юзернейма с валидацией id = user_id, смотреть условия
-func UpdateUsername(id int,username string)error{
+func UpdateUsername(id int64,username string)error{
 	var now time.Time
 
 	err := validate.Var(username,"required,min=6,max=20,alphanum") //от 6 до 20 чаров, символы a-z A-Z 0-9
@@ -211,7 +211,7 @@ func UpdateUsername(id int,username string)error{
 	return nil
 }
 // смена пароля с валидацией id = user_id
-func UpdatePassword(id int,password string)error{
+func UpdatePassword(id int64,password string)error{
 	var now time.Time
 
 	err := validate.Var(password,"required,min=4,max=25,alphanum")
@@ -229,7 +229,7 @@ func UpdatePassword(id int,password string)error{
 }
 
 // смена только имейла с валидацией, id = user_id
-func UpdateEmail(id int,email string)error{
+func UpdateEmail(id int64,email string)error{
 	var now time.Time
 
 	err := validate.Var(email,"required,email")
@@ -247,7 +247,7 @@ func UpdateEmail(id int,email string)error{
 }
 
 // догадайся блять че делает 
-func DeleteUser(id int)error{
+func DeleteUser(id int64)error{
 	defer conn.Close(context.Background())
 	query := "DELETE FROM users WHERE id = $1"
 
@@ -258,7 +258,7 @@ func DeleteUser(id int)error{
 	return nil
 }
 // возвращает одного юзера по айди
-func GetUser(id int) (*models.User,error){
+func GetUser(id int64) (*models.User,error){
 	user := models.User{}
 	query := "SELECT * FROM users WHERE id = $1"
 
@@ -313,4 +313,107 @@ func GetUsersFromTo(from int,to int)([]models.User,error){
 		res = append(res, user)
 	}
 	return res,nil
+}
+//Создаёт итем из модели models.item, возвращая айди итема или ошибку
+func CreateItem(i *models.Item)(int64,error){
+	query := "INSERT INTO items (title,stock,price,sale_percent,tags,description) values($1,$2,$3,$4,$5,$6) RETURNING id"
+
+	err := conn.QueryRow(context.Background(),query,i.Title,i.Stock,i.Price,i.SalePercent,i.Tags,i.Description).Scan(&i.Id)
+	if err != nil {
+        sl.PLogger.Error("cannot create item", "error", err.Error())
+		return i.Id, err
+    }
+	return i.Id,nil
+}
+//Полный апдейт итема при помощи модели models.item по айди, возвращает, или ноль при удаче, или ошибку
+func UpdateItem(id int64, i *models.Item)error{
+	query := "UPDATE items SET title = $1,stock = $2,price = $3,sale_percent = $4,tags = $5, description = $6 where id = $7"
+
+	_, err := conn.Exec(context.Background(),query,i.Title,i.Stock,i.Price,i.SalePercent,i.Tags,i.Description,id)
+	if err != nil{
+		sl.PLogger.Error("cannot update item", "error", err.Error())
+		return err
+	}
+	return nil
+
+}
+
+
+//Меняет название итема по айдишнику, возвращает ошибку, либо ноль при удаче
+func UpdateItemTitle(id int64, itemtitle string)error{
+
+ query := "UPDATE items SET title = $1 where id = $2"
+
+ _,err := conn.Exec(context.Background(),query,itemtitle,id)
+	if err != nil {
+        sl.PLogger.Error("cannot update item", "error", err.Error())
+		return err
+    }
+	return nil
+
+}
+//Меняет количесвто на складе итема по айдишнику, возвращает ошибку, либо ноль при удаче
+func UpdateItemStock(id int64, itemstock int64)error{
+
+	query := "UPDATE items SET stock = $1 where id = $2"
+   
+	_,err := conn.Exec(context.Background(),query,itemstock,id)
+	   if err != nil {
+		   sl.PLogger.Error("cannot update item", "error", err.Error())
+		   return err
+	   }
+	   return nil
+   
+   }
+//Меняет цену итема по айдишнику, возвращает ошибку, либо ноль при удаче
+func UpdateItemPrice(id int64, itemprice int)error{
+
+ query := "UPDATE items SET price = $1 where id = $2"
+
+ _,err := conn.Exec(context.Background(),query,itemprice,id)
+	if err != nil {
+        sl.PLogger.Error("cannot update item", "error", err.Error())
+		return err
+    }
+	return nil
+
+}   
+//Меняет процент сккидки итема по айдишнику, возвращает ошибку, либо ноль при удаче
+func UpdateItemSalePerc(id int64, itemsaleperc int16)error{
+
+	query := "UPDATE items SET sale_percent = $1 where id = $2"
+   
+	_,err := conn.Exec(context.Background(),query,itemsaleperc,id)
+	   if err != nil {
+		   sl.PLogger.Error("cannot update item", "error", err.Error())
+		   return err
+	   }
+	   return nil
+   
+}
+//Меняет теги итема по айдишнику, возвращает ошибку, либо ноль при удаче
+func UpdateItemTags(id int64, itemtags string)error{
+
+	query := "UPDATE items SET tags = $1 where id = $2"
+   
+	_,err := conn.Exec(context.Background(),query,itemtags,id)
+	   if err != nil {
+		   sl.PLogger.Error("cannot update item", "error", err.Error())
+		   return err
+	   }
+	   return nil
+   
+}
+//Меняет описание итема по айдишнику, возвращает ошибку, либо ноль при удаче
+func UpdateItemDesc(id int64, itemdesc string)error{
+
+	query := "UPDATE items SET description = $1 where id = $2"
+   
+	_,err := conn.Exec(context.Background(),query,itemdesc,id)
+	   if err != nil {
+		   sl.PLogger.Error("cannot update item", "error", err.Error())
+		   return err
+	   }
+	   return nil
+   
 }
