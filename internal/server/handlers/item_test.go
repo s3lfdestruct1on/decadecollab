@@ -3,6 +3,8 @@ package handlers
 import (
 	"decadecollab/internal/models"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/go-playground/validator/v10"
@@ -26,11 +28,11 @@ func TestErrorNewItem(t *testing.T) {
 	cases := []struct {
 		name  string
 		model *models.Item
-	}{
+ 	}{
 		{
 			name: "bad_item_title",
 			model: &models.Item{
-				Title: "aa",
+				Title: "aaa",
 				Stock: 1,
 				Price: 1,
 			},
@@ -52,11 +54,11 @@ func TestErrorNewItem(t *testing.T) {
 			},
 		},
 	}
-	v := validator.New() 
+	v := validator.New()
 	for _, tCase := range cases{
 		t.Run(tCase.name, func(t *testing.T){
 			err := v.Struct(tCase.model)
-			require.Error(t, err)
+			assert.Error(t, err)
 		})
 		
 	}
