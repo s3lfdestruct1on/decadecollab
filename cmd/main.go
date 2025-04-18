@@ -17,31 +17,36 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-
 var (
-  cfg = config.Config{
-	AppHostPort: os.Getenv("HOSTPORT"),
-  }
-  testuser = models.User{
-	Username: "2aaaaaaaaaa",
-	Password: "444A",
-	Email: "gg3@gg.gg",
-  }
+	cfg = config.Config{
+		AppHostPort: os.Getenv("HOSTPORT"),
+	}
+	testuser = models.User{
+		Username: "2aaaaaaaaaa",
+		Password: "444A",
+		Email:    "gg3@gg.gg",
+	}
+
+	testitem = models.Item{
+		Title: "asdasd2",
+		Stock: 1,
+		Price: 1,
+	}
 )
+
 func main() {
 
-	
-	
 	server := echo.New()
 	postgre.InitDB()
 	apiv1 := server.Group("/api/v1")
-	postgre.CreateUser(&testuser)	
+	postgre.GetItem(18)
 	apiv1.GET("/time", handlers.CurrentTime)
 	apiv1.GET("/user/:id", handlers.GetUser)
-	
+	apiv1.POST("/item/add", handlers.NewItem)
+	apiv1.POST("/item/update", handlers.UpdateItem)
+
 	if err := server.Start(cfg.AppHostPort); err != nil {
 		sl.PLogger.Error("unable to start server", "error", err.Error())
 	}
-	
-	
+
 }

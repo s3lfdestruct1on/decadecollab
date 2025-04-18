@@ -6,7 +6,7 @@ import (
 	"decadecollab/internal/lib/logger/sl"
 	"decadecollab/internal/models"
 	db "decadecollab/internal/storage"
-	"errors"
+	
 	"time"
 
 	"os"
@@ -57,7 +57,7 @@ func InitDB() error {
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
         sl.PLogger.Error("unable to init db at 3 part", "error", err.Error())
-		return errors.New("gg")
+		return err
     }
     
     return nil
@@ -77,7 +77,7 @@ func InitItemsDB() error {
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
         sl.PLogger.Error("unable to create items db", "error", err.Error())
-    return errors.New("gg")
+    return err
     }
 	return nil
 }
@@ -95,7 +95,7 @@ func InitBasketDB() error {
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
         sl.PLogger.Error("failed to create basket db", "error", err.Error())
-    return errors.New("gg")
+    return err
     }
     
     return nil
@@ -115,7 +115,7 @@ func InitOrderItemsDB() error {
     _, err := conn.Exec(context.Background(), query)
     if err != nil {
         sl.PLogger.Error("failed to create order_items db", "error", err.Error())
-    return errors.New("gg")
+    return err
     }
     return nil
 }
@@ -149,7 +149,7 @@ func InitOrderDB() error {
 	_, err := conn.Exec(context.Background(), query)
     if err != nil {
         sl.PLogger.Error("failed to create order db", "error", err.Error())
-		return errors.New("gg")
+		return err
     }
 
     return nil
@@ -172,6 +172,7 @@ func CreateUser(u *models.User)(int64,error){
     }
 	return u.Id,nil
 }
+
 // апдейт с валидацией полностью пользователя,смотреть условия
 func UpdateUser(id int64, u *models.User)error{
 	var now time.Time
@@ -316,15 +317,34 @@ func GetUsersFromTo(from int,to int)([]models.User,error){
 }
 //Создаёт итем из модели models.item, возвращая айди итема или ошибку
 func CreateItem(i *models.Item)(int64,error){
+	err := validate.Struct(i)
+	if err != nil {
+		sl.PLogger.Error("invalid item info", "error", err.Error())
+		return i.Id, err
+	}
+	
 	query := "INSERT INTO items (title,stock,price,sale_percent,tags,description) values($1,$2,$3,$4,$5,$6) RETURNING id"
 
-	err := conn.QueryRow(context.Background(),query,i.Title,i.Stock,i.Price,i.SalePercent,i.Tags,i.Description).Scan(&i.Id)
+	err = conn.QueryRow(context.Background(),query,i.Title,i.Stock,i.Price,i.SalePercent,i.Tags,i.Description).Scan(&i.Id)
 	if err != nil {
         sl.PLogger.Error("cannot create item", "error", err.Error())
 		return i.Id, err
     }
 	return i.Id,nil
 }
+//Полученние итема по айди в модель models.Item
+func GetItem(id int64) (*models.Item,error){
+	item := models.Item{}
+	query := "SELECT * FROM items WHERE id = $1"
+
+	err := conn.QueryRow(context.Background(),query,id).Scan(&item.Id,&item.Title,&item.Stock,&item.Price,&item.SalePercent,&item.Tags,&item.Description)
+	if err != nil{
+		sl.PLogger.Error("item not found", "error", err.Error())
+		return &item, err
+	}
+	return &item,nil
+}
+
 //Полный апдейт итема при помощи модели models.item по айди, возвращает, или ноль при удаче, или ошибку
 func UpdateItem(id int64, i *models.Item)error{
 	query := "UPDATE items SET title = $1,stock = $2,price = $3,sale_percent = $4,tags = $5, description = $6 where id = $7"
