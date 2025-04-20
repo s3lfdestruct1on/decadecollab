@@ -33,3 +33,20 @@ type Basket struct{
   Quantity int16
   TotalPrice decimal.Decimal
 }
+
+type Order struct{
+  Id int64
+  User_id int64
+  Total_price decimal.Decimal
+  Shipping_address string
+  Delivery_date time.Time
+  
+}
+
+type Order_Items struct{
+   Id int64
+   Order_id int64
+   Item_id int64
+   Quantity int16
+   Total_price decimal.Decimal
+}

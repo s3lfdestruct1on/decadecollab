@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"os"
-
+    "github.com/shopspring/decimal"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -104,11 +104,11 @@ func InitBasketDB() error {
 func InitOrderItemsDB() error {
     query := `
   		CREATE TABLE IF NOT EXISTS order_items (
-        id 			BIGINT PRIMARY KEY,
+        id 			BIGSERIAL PRIMARY KEY,
     	order_id 	BIGINT NOT NULL,
     	item_id 	BIGINT NOT NULL,
     	quantity 	INTEGER NOT NULL,
-    	unit_price 	DECIMAL(10, 2) NOT NULL,
+    	total_price DECIMAL(10, 2) NOT NULL,
     	FOREIGN KEY (order_id) REFERENCES orders(id),
     	FOREIGN KEY (item_id) REFERENCES items(id)
     );`
@@ -137,7 +137,7 @@ func InitOrderDB() error {
     CREATE TABLE IF NOT EXISTS orders (
         id BIGSERIAL PRIMARY KEY,
         user_id BIGINT NOT NULL,
-        total_amount DECIMAL(10, 2) NOT NULL,
+        total_price DECIMAL(10, 2) NOT NULL,
         shipping_address TEXT NOT NULL,
         delivery_date TIMESTAMP,
         status status DEFAULT 'created',
@@ -248,7 +248,6 @@ func UpdateEmail(id int64,email string)error{
 
 // догадайся блять че делает 
 func DeleteUser(id int64)error{
-	defer conn.Close(context.Background())
 	query := "DELETE FROM users WHERE id = $1"
 
 	_,err := conn.Exec(context.Background(),query,id)
@@ -319,7 +318,7 @@ func GetUsersFromTo(from int,to int)([]models.User,error){
 func CreateItem(i *models.Item)(int64,error){
 	query := "INSERT INTO items (title,stock,price,sale_percent,tags,description) values($1,$2,$3,$4,$5,$6) RETURNING id"
 
-	err := conn.QueryRow(context.Background(),query,i.Title,i.Stock,i.Price,i.SalePercent,i.Tags,i.Description).Scan(&i.Id)
+	err := conn.QueryRow(context.Background(),query,i.Title,i.Stock,i.Price.String(),i.SalePercent,i.Tags,i.Description).Scan(&i.Id)
 	if err != nil {
         sl.PLogger.Error("cannot create item", "error", err.Error())
 		return i.Id, err
@@ -330,7 +329,7 @@ func CreateItem(i *models.Item)(int64,error){
 func UpdateItem(id int64, i *models.Item)error{
 	query := "UPDATE items SET title = $1,stock = $2,price = $3,sale_percent = $4,tags = $5, description = $6 where id = $7"
 
-	_, err := conn.Exec(context.Background(),query,i.Title,i.Stock,i.Price,i.SalePercent,i.Tags,i.Description,id)
+	_, err := conn.Exec(context.Background(),query,i.Title,i.Stock,i.Price.String(),i.SalePercent,i.Tags,i.Description,id)
 	if err != nil{
 		sl.PLogger.Error("cannot update item", "error", err.Error())
 		return err
@@ -354,7 +353,7 @@ func UpdateItemTitle(id int64, itemtitle string)error{
 
 }
 //Меняет количесвто на складе итема по айдишнику, возвращает ошибку, либо ноль при удаче
-func UpdateItemStock(id int64, itemstock int64)error{
+func UpdateItemStock(id int64, itemstock int16)error{
 
 	query := "UPDATE items SET stock = $1 where id = $2"
    
@@ -367,11 +366,11 @@ func UpdateItemStock(id int64, itemstock int64)error{
    
    }
 //Меняет цену итема по айдишнику, возвращает ошибку, либо ноль при удаче
-func UpdateItemPrice(id int64, itemprice int)error{
+func UpdateItemPrice(id int64, itemprice decimal.Decimal)error{
 
  query := "UPDATE items SET price = $1 where id = $2"
 
- _,err := conn.Exec(context.Background(),query,itemprice,id)
+ _,err := conn.Exec(context.Background(),query,itemprice.String(),id)
 	if err != nil {
         sl.PLogger.Error("cannot update item", "error", err.Error())
 		return err
@@ -435,7 +434,7 @@ func AddItemToBasket(item_id int64,user_id int64)error{
 	}
 
     if err != nil {
-        sl.PLogger.Error("failed to check item availability: %w", err)
+        sl.PLogger.Error("failed to check item availability", err.Error())
 		return err
     }
 
@@ -447,14 +446,13 @@ func AddItemToBasket(item_id int64,user_id int64)error{
     `, user_id, item_id)
 
     if err != nil {
-        sl.PLogger.Error("failed to add item to basket: %w", err)
+        sl.PLogger.Error("failed to add item to basket", err.Error())
 		return err
     }
 
-    // Фиксируем транзакцию
     err = tx.Commit(context.Background())
     if err != nil {
-        sl.PLogger.Error("failed to commit transaction: %w", err)
+        sl.PLogger.Error("failed to commit transaction",err.Error())
 		return err
     }
 
@@ -551,4 +549,63 @@ func GetBasketItems(user_id int64)([]models.Basket,error){
     }
 
     return basketItems, nil
+}
+
+func CreateOrdersFromBaskets(user_id int64,shipping_address string,delivery_date time.Time)error{
+	tx, err := conn.Begin(context.Background())
+    if err != nil {
+        sl.PLogger.Error("failed to begin transaction: %w", err)
+        return err
+    }
+    defer tx.Rollback(context.Background()) 
+	baskets,err:= GetBasketItems(user_id)
+	if err != nil{
+		sl.PLogger.Error("failed to get baskets: %w", err)
+	}
+
+	var order_id int64
+	err = tx.QueryRow(context.Background(), `
+        INSERT INTO orders (user_id, shipping_address,delivery_date,total_price)
+        VALUES ($1, $2, $3,$4)
+        RETURNING id
+    `, user_id, shipping_address,delivery_date, 1).Scan(&order_id)
+    if err != nil {
+		sl.PLogger.Error("failed to create order: %w", err)
+        return err
+    }
+    var total_price decimal.Decimal
+	for _,basket := range baskets{
+		_, err = tx.Exec(context.Background(), `
+        INSERT INTO order_items (order_id, item_id, quantity, total_price)
+        VALUES($1, $2, $3, $4)
+    `, order_id, basket.ItemID,basket.Quantity,basket,basket.TotalPrice)
+    if err != nil {
+        sl.PLogger.Error("failed to create order_items: %w", err)
+        return err
+    }
+    total_price.Add(basket.TotalPrice)
+	}
+	_, err = tx.Exec(context.Background(), `
+        UPDATE orders
+        SET total_price = $1
+        WHERE id = $2
+    `, total_price.String(), order_id)
+    if err != nil {
+        sl.PLogger.Error("failed to update order total price: %w", err)
+        return err
+    }
+    _, err = tx.Exec(context.Background(), `
+        DELETE FROM baskets
+        WHERE user_id = $1
+    `, user_id)
+    if err != nil {
+        sl.PLogger.Error("failed to delete  order baskets: %w", err)
+        return err
+    }
+    err = tx.Commit(context.Background()) 
+    if err != nil {
+        sl.PLogger.Error("failed to commit: %w", err)
+        return err
+    }
+    return nil
 }
