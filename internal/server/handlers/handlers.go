@@ -42,4 +42,6 @@ func CreateUser(c echo.Context) error{
 
 	}
 	service.NewUser(user)
+
+	return c.JSON(http.StatusOK,"user successfully created")
 }

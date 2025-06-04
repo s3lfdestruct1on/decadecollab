@@ -37,6 +37,9 @@ func main() {
 	postgre.CreateUser(&testuser)	
 	apiv1.GET("/time", handlers.CurrentTime)
 	apiv1.GET("/user/:id", handlers.GetUser)
+	apiv1.POST("/user/new",handlers.CreateUser)
+	apiv1.DELETE("/user/delete",handlers.DeleteUser)
+
 	
 	if err := server.Start(cfg.AppHostPort); err != nil {
 		sl.PLogger.Error("unable to start server", "error", err.Error())
