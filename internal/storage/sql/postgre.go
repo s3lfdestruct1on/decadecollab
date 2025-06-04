@@ -23,11 +23,8 @@ var(
 	Database: os.Getenv("DB"),
 	}
 
-   
-
     conn,_ = db.DBConn(sqlcfg)
     validate = validator.New()
-
 )
 
 func InitDB() error {
