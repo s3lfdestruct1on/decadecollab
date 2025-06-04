@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"decadecollab/internal/lib/logger/sl"
+	"decadecollab/internal/models"
 	service "decadecollab/internal/services"
 	"net/http"
 	"strconv"
@@ -22,4 +23,23 @@ func GetUser(c echo.Context) error {
 	// GetUser возвращает models.User{} (обработка всех возможных ошибок происходит на стороне репозитория)
 	user := service.GetUser(id)
 	return c.JSON(http.StatusOK, user)
+}
+
+func DeleteUser(c echo.Context) error{
+	id, err := strconv.ParseInt(c.Param("id"),10,64)
+	if err != nil{
+		sl.PLogger.Error("user not found", "error", err.Error())
+	}
+	service.DeleteUser(id)
+	return c.JSON(http.StatusOK,"user successfully deleted")
+}
+
+func CreateUser(c echo.Context) error{
+ 	user := new(models.User)
+	err := c.Bind(user)
+	if err != nil {
+		sl.PLogger.Error("unable to create user", "error", err.Error())
+
+	}
+	service.NewUser(user)
 }
