@@ -1,14 +1,42 @@
 package handlers
 
 import (
+	//"context"
+	"decadecollab/internal/config"
+	//"decadecollab/internal/lib/logger/sl"
 	"decadecollab/internal/models"
+	db "decadecollab/internal/storage"
+	fake_postgre "decadecollab/internal/storage/fake_sql"
+	"decadecollab/internal/storage/fake_sql/test_postgre"
+
+	//postgre "decadecollab/internal/storage/sql"
+
+	//postgre "decadecollab/internal/storage/sql"
+	//"os"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/go-playground/validator/v10"
 )
+
+var(
+	sqlcfg = config.PSQLConfig{
+	Port: "5432",
+	Username: "admin",
+	Password: "admin",
+	Database: "my_db",
+	}
+
+   
+
+    conn,_ = db.DBConn(sqlcfg)
+    validate = validator.New()
+
+)
+
 
 func TestNewItem(t *testing.T) {
 
@@ -64,4 +92,58 @@ func TestErrorNewItem(t *testing.T) {
 	}
 	
 
+}
+
+//турбозаглушка
+func TestTURBOCreateAndGetItem(t *testing.T){
+	TMI := models.Item{}
+	TNI := models.Item{
+		Id: 1,
+		Title: "Innuendo",
+		Stock: 1488,
+		Price: 1984,
+	}
+	err := fake_postgre.GetItem(&TMI, 0)
+	require.NoError(t, err)
+
+	err = fake_postgre.CreateItem(&TNI, &TMI)
+	require.NoError(t, err)
+
+	err = fake_postgre.GetItem(&TMI, TNI.Id)
+	require.NoError(t, err)
+}
+
+
+
+
+
+
+
+
+
+
+
+func TestCreateAndGetItem(t *testing.T){
+	ItemModel := models.Item{
+		Title: "title",
+		Stock: 1,
+		Price: 1,
+	}
+	
+	
+	err := test_postgre.InitItemsDB()
+	require.NoError(t, err)
+
+	_, err = test_postgre.GetItem(1)
+	//require.NoError(t, err)
+	require.Equal(t, pgx.ErrNoRows, err)
+
+	id, err := test_postgre.CreateItem(&ItemModel)
+	require.NoError(t, err)
+
+	_, err = test_postgre.GetItem(id)
+	require.NoError(t, err)
+
+	err = test_postgre.DropItem()
+	require.NoError(t, err)
 }

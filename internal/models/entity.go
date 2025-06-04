@@ -17,7 +17,7 @@ type Item struct {
 	Id          int64  `json:"id"`
 	Title       string `json:"title" validate:"min=3"`
 	Stock       int64  `json:"stock" validate:"numeric,gt=0"`
-	Price       int    `json:"price" validate:"numeric"`
+	Price       int    `json:"price" validate:"numeric,gt=0"`
 	SalePercent int16  `json:"saleperc"`
 	Tags        string `json:"tags"`
 	Description string `json:"desc"`
