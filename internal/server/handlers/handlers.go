@@ -45,3 +45,16 @@ func CreateUser(c echo.Context) error{
 
 	return c.JSON(http.StatusOK,"user successfully created")
 }
+
+func UpdateUser(c echo.Context) error{
+	id,err := strconv.ParseInt(c.Param("id"),10,64)
+	if err != nil{
+		sl.PLogger.Error("user not found", "error", err.Error())
+	}
+	user := new(models.User)
+	c.Bind(user)
+	service.UpdateUser(id,user)
+	
+	return c.JSON(http.StatusOK,"user successfully updated")
+
+}

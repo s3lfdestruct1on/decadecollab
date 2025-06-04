@@ -15,7 +15,7 @@ type User struct {
 	LastActive time.Time  `json:"LastActive"`
 	CreatedAt  time.Time  `json:"CreatedAt"`
 	UpdatedAt  time.Time  `json:"UpdatedAt"`
-  Role       string     `json:"Role`
+  Role       string     `json:"Role"`
 }
 
 type Item struct {
