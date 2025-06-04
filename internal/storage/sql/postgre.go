@@ -46,7 +46,7 @@ func InitDB() error {
         name 		VARCHAR(255) NOT NULL,
         password	VARCHAR(255) NOT NULL,
         email 		VARCHAR(255) UNIQUE NOT NULL,
-		last_active TIMESTAMP,
+		last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		created_at 	TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at 	TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		role 		ROLENAME DEFAULT 'customer'
@@ -258,7 +258,16 @@ func GetUser(id int64) (*models.User,error){
 	user := models.User{}
 	query := "SELECT * FROM users WHERE id = $1"
 
-	err := conn.QueryRow(context.Background(),query,id).Scan(&user.Id,&user.Username,&user.Password,&user.Email)
+	err := conn.QueryRow(context.Background(),query,id).Scan(
+        &user.Id,
+        &user.Username,
+        &user.Password,
+        &user.Email,
+        &user.CreatedAt,
+        &user.LastActive,
+        &user.UpdatedAt,
+        &user.Role,
+        )
 	if err != nil{
 		sl.PLogger.Error("user not found", "error", err.Error())
 	}

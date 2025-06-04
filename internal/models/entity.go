@@ -8,13 +8,14 @@ import (
 
 // TODO: review всего этого дерьма сделать
 type User struct {
-	Id         int64
-	Username   string `json:"username" validate:"required,min=6,max=20,alphanum"`
-	Password   string `json:"password" validate:"required,min=4,max=25,alphanum"`
-	Email      string `json:"email" validate:"required,email"`
-	LastActive time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	Id         int64      `json:"id"`
+	Username   string     `json:"username" validate:"required,min=6,max=20,alphanum"`
+	Password   string     `json:"password" validate:"required,min=4,max=25,alphanum"`
+	Email      string     `json:"email" validate:"required,email"`
+	LastActive time.Time  `json:"LastActive"`
+	CreatedAt  time.Time  `json:"CreatedAt"`
+	UpdatedAt  time.Time  `json:"UpdatedAt"`
+  Role       string     `json:"Role`
 }
 
 type Item struct {
